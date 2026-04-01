@@ -131,6 +131,15 @@ router.post("/poll", [
         });
         snack_token_generated = true;
         token_data = { token_code, valid_for: menu.meal_type };
+      } else {
+        if (existing.status === "EXPIRED") {
+          await prisma.snackToken.update({
+            where: { id: existing.id },
+            data: { status: "ISSUED" }
+          });
+        }
+        snack_token_generated = true;
+        token_data = { token_code: existing.token_code, valid_for: menu.meal_type };
       }
     } else if (intention === "YES") {
       await prisma.snackToken.updateMany({

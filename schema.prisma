@@ -1,0 +1,172 @@
+// prisma/schema.prisma
+// Mess Management & AI Optimization App
+// Maps exactly to database.md specification
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// 2.1 users
+// ─────────────────────────────────────────────
+model User {
+  id             String   @id @default(uuid())
+  name           String   @db.VarChar(100)
+  email          String   @unique @db.VarChar(150)
+  password_hash  String   @db.VarChar(255)
+  role           Role     @default(STUDENT)
+  hostel_id      String   @db.VarChar(50)
+  advance_paid   Decimal  @default(0.00) @db.Decimal(10, 2)
+  current_balance Decimal @default(0.00) @db.Decimal(10, 2)
+  fee_due_status Boolean  @default(false)
+  amount_due     Decimal  @default(0.00) @db.Decimal(10, 2)
+  created_at     DateTime @default(now())
+
+  // Relations
+  polls           Poll[]
+  snack_tokens    SnackToken[]
+  meal_attendance MealAttendance[]
+  transactions    Transaction[]
+
+  @@index([hostel_id, fee_due_status])  // For defaulter list queries
+  @@map("users")
+}
+
+enum Role {
+  STUDENT
+  MANAGER
+}
+
+// ─────────────────────────────────────────────
+// 2.2 verification_codes (OTP)
+// ─────────────────────────────────────────────
+model VerificationCode {
+  id         String   @id @default(uuid())
+  email      String   @db.VarChar(150)
+  otp_code   String   @db.VarChar(6)
+  expires_at DateTime
+  is_used    Boolean  @default(false)
+
+  @@map("verification_codes")
+}
+
+// ─────────────────────────────────────────────
+// 2.3 menus
+// ─────────────────────────────────────────────
+model Menu {
+  id               String   @id @default(uuid())
+  meal_date        DateTime @db.Date
+  meal_type        MealType
+  items            Json     // JSONB array e.g. ["Rice","Dal","Paneer"]
+  serve_time       DateTime
+  poll_cutoff_time DateTime // Computed as serve_time - 4 hours on insert
+
+  // Relations
+  polls           Poll[]
+  meal_attendance MealAttendance[]
+
+  @@map("menus")
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  SNACKS
+  DINNER
+}
+
+// ─────────────────────────────────────────────
+// 2.4 polls
+// ─────────────────────────────────────────────
+model Poll {
+  id         String    @id @default(uuid())
+  student_id String
+  menu_id    String
+  intention  Intention
+  voted_at   DateTime  @default(now())
+
+  // Relations
+  student     User         @relation(fields: [student_id], references: [id])
+  menu        Menu         @relation(fields: [menu_id], references: [id])
+  snack_token SnackToken?
+
+  // Unique constraint: one vote per student per meal
+  @@unique([student_id, menu_id])
+  @@index([menu_id, intention])   // For quick aggregate counts on manager dashboard
+  @@map("polls")
+}
+
+enum Intention {
+  YES
+  NO
+}
+
+// ─────────────────────────────────────────────
+// 2.5 snack_tokens
+// ─────────────────────────────────────────────
+model SnackToken {
+  id          String      @id @default(uuid())
+  student_id  String
+  poll_id     String      @unique   // 1:1 with the "NO" poll
+  token_code  String      @unique @db.VarChar(255)
+  status      TokenStatus @default(ISSUED)
+  redeemed_at DateTime?
+
+  // Relations
+  student User @relation(fields: [student_id], references: [id])
+  poll    Poll @relation(fields: [poll_id], references: [id])
+
+  @@index([token_code, status])   // For instant lookup at the counter
+  @@map("snack_tokens")
+}
+
+enum TokenStatus {
+  ISSUED
+  REDEEMED
+  EXPIRED
+}
+
+// ─────────────────────────────────────────────
+// 2.6 meal_attendance
+// ─────────────────────────────────────────────
+model MealAttendance {
+  id               String   @id @default(uuid())
+  student_id       String
+  menu_id          String
+  scanned_at       DateTime @default(now())
+  deduction_amount Decimal  @db.Decimal(10, 2)
+
+  // Relations
+  student User @relation(fields: [student_id], references: [id])
+  menu    Menu @relation(fields: [menu_id], references: [id])
+
+  @@map("meal_attendance")
+}
+
+// ─────────────────────────────────────────────
+// 2.7 transactions
+// ─────────────────────────────────────────────
+model Transaction {
+  id              String            @id @default(uuid())
+  student_id      String
+  amount          Decimal           @db.Decimal(10, 2)
+  gateway_ref_id  String            @unique @db.VarChar(255)
+  status          TransactionStatus
+  paid_at         DateTime          @default(now())
+
+  // Relations
+  student User @relation(fields: [student_id], references: [id])
+
+  @@map("transactions")
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
