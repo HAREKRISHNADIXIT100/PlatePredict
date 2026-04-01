@@ -1,0 +1,111 @@
+// prisma/schema.prisma
+// Adapted for SQLite local development
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  password_hash   String
+  role            String   @default("STUDENT")
+  hostel_id       String
+  advance_paid    Float    @default(0.00)
+  current_balance Float    @default(0.00)
+  fee_due_status  Boolean  @default(false)
+  amount_due      Float    @default(0.00)
+  created_at      DateTime @default(now())
+
+  polls           Poll[]
+  snack_tokens    SnackToken[]
+  meal_attendance MealAttendance[]
+  transactions    Transaction[]
+
+  @@map("users")
+}
+
+model VerificationCode {
+  id         String   @id @default(uuid())
+  email      String
+  otp_code   String
+  expires_at DateTime
+  is_used    Boolean  @default(false)
+
+  @@map("verification_codes")
+}
+
+model Menu {
+  id               String   @id @default(uuid())
+  meal_date        DateTime
+  meal_type        String
+  items            String   // JSON string array
+  serve_time       DateTime
+  poll_cutoff_time DateTime
+
+  polls           Poll[]
+  meal_attendance MealAttendance[]
+
+  @@map("menus")
+}
+
+model Poll {
+  id         String   @id @default(uuid())
+  student_id String
+  menu_id    String
+  intention  String
+  voted_at   DateTime @default(now())
+
+  student     User         @relation(fields: [student_id], references: [id])
+  menu        Menu         @relation(fields: [menu_id], references: [id])
+  snack_token SnackToken?
+
+  @@unique([student_id, menu_id])
+  @@map("polls")
+}
+
+model SnackToken {
+  id          String    @id @default(uuid())
+  student_id  String
+  poll_id     String    @unique
+  token_code  String    @unique
+  status      String    @default("ISSUED")
+  redeemed_at DateTime?
+
+  student User @relation(fields: [student_id], references: [id])
+  poll    Poll @relation(fields: [poll_id], references: [id])
+
+  @@map("snack_tokens")
+}
+
+model MealAttendance {
+  id               String   @id @default(uuid())
+  student_id       String
+  menu_id          String
+  scanned_at       DateTime @default(now())
+  deduction_amount Float
+
+  student User @relation(fields: [student_id], references: [id])
+  menu    Menu @relation(fields: [menu_id], references: [id])
+
+  @@map("meal_attendance")
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  student_id     String
+  amount         Float
+  gateway_ref_id String   @unique
+  status         String
+  paid_at        DateTime @default(now())
+
+  student User @relation(fields: [student_id], references: [id])
+
+  @@map("transactions")
+}
