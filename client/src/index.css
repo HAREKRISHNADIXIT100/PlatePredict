@@ -6,18 +6,18 @@
 
 :root {
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg: #0a0a12;
-  --bg-card: #12121e;
-  --bg-card-hover: #1a1a2e;
-  --bg-input: #16162a;
-  --border: #1e1e3a;
-  --border-focus: #6c5ce7;
-  --text: #e8e8f0;
-  --text-muted: #8888a8;
-  --text-dim: #55556e;
-  --accent: #6c5ce7;
-  --accent-hover: #7d6ff0;
-  --accent-glow: rgba(108, 92, 231, 0.2);
+  --bg: #432818;
+  --bg-card: #6f1d1b;
+  --bg-card-hover: #99582a;
+  --bg-input: #6f1d1b;
+  --border: #99582a;
+  --border-focus: #bb9457;
+  --text: #ffe6a7;
+  --text-muted: #bb9457;
+  --text-dim: rgba(255, 230, 167, 0.5);
+  --accent: #bb9457;
+  --accent-hover: rgba(187, 148, 87, 0.8);
+  --accent-glow: rgba(187, 148, 87, 0.2);
   --green: #00d2a0;
   --green-bg: rgba(0, 210, 160, 0.1);
   --red: #ff6b6b;
@@ -428,7 +428,7 @@ tr:hover td {
 
 /* ─── AI Widget ─────────────────────────────────────────────────────────────── */
 .ai-widget {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, #6f1d1b 0%, #432818 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 28px;
@@ -599,7 +599,7 @@ tr:hover td {
 
 /* ─── Payment Widget ────────────────────────────────────────────────────────── */
 .payment-widget {
-  background: linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 100%);
+  background: linear-gradient(135deg, #6f1d1b 0%, #432818 100%);
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   padding: 24px;

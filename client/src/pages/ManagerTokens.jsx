@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 
 export default function ManagerTokens() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [error, setError] = useState('');
   const [redeemLoading, setRedeemLoading] = useState({});
   const [successMsg, setSuccessMsg] = useState('');
@@ -48,9 +50,12 @@ export default function ManagerTokens() {
           id="token-search"
           type="text"
           className="form-input"
-          placeholder="Search by student name..."
+          placeholder="Search by student or code..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setSearchParams(e.target.value ? { search: e.target.value } : {});
+          }}
           style={{ maxWidth: 320 }}
         />
         {data && (

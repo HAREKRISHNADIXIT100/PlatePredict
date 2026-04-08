@@ -118,7 +118,10 @@ router.get("/tokens/active", async (req, res, next) => {
 
     const whereClause = { status: "ISSUED", poll: { menu_id: nextMenu.id } };
     if (search && search.trim()) {
-      whereClause.student = { name: { contains: search.trim() } };
+      whereClause.OR = [
+        { student: { name: { contains: search.trim() } } },
+        { token_code: { contains: search.trim() } }
+      ];
     }
 
     const tokens = await prisma.snackToken.findMany({
@@ -205,6 +208,9 @@ router.get("/menus", async (req, res, next) => {
     let whereClause = {};
     if (dateStr) {
       const target = new Date(dateStr);
+      if (isNaN(target.getTime()) || target.getFullYear() < 2000 || target.getFullYear() > 2100) {
+        return res.status(400).json({ error: "Invalid date format or year out of range." });
+      }
       target.setHours(0, 0, 0, 0);
       const nextDay = new Date(target.getTime() + 86400000);
       whereClause.meal_date = { gte: target, lt: nextDay };

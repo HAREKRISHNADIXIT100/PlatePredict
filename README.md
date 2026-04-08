@@ -126,7 +126,7 @@ npm start            # Production
 ## Default Credentials (after seed)
 ```
 Manager:  manager@college.edu  / Manager@1234
-Student:  rahul.k@college.edu  / Student@1234
+Student:  rahulk.cs.25@nitj.ac.in  / Student@1234
 ```
 
 ## Background Jobs

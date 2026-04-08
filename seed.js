@@ -87,7 +87,7 @@ async function main() {
   }
 
   // ── 3. Seed a sample student for testing ─────────────────────────────────
-  const studentEmail = "rahul.k@college.edu";
+  const studentEmail = "rahulk.cs.25@nitj.ac.in";
   const existingStudent = await prisma.user.findUnique({
     where: { email: studentEmail },
   });
@@ -106,7 +106,7 @@ async function main() {
         fee_due_status: false,
       },
     });
-    console.log("✅ Test student created (rahul.k@college.edu / Student@1234)");
+    console.log("✅ Test student created (rahulk.cs.25@nitj.ac.in / Student@1234)");
   } else {
     console.log("ℹ️  Test student already exists, skipping.");
   }

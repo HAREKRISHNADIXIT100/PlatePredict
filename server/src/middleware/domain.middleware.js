@@ -5,7 +5,7 @@ const checkEmailDomain = (req, res, next) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email is required." });
 
-  const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || "college.edu")
+  const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || "nitj.ac.in")
     .split(",")
     .map((d) => d.trim().toLowerCase());
 

@@ -24,7 +24,7 @@ async function main() {
   }
 
   // Test student
-  const studentEmail = "rahul.k@college.edu";
+  const studentEmail = "rahulk.cs.25@nitj.ac.in";
   let student = await prisma.user.findUnique({ where: { email: studentEmail } });
   if (!student) {
     student = await prisma.user.create({
@@ -38,11 +38,11 @@ async function main() {
         current_balance: 12450.50,
       },
     });
-    console.log("✅ Student: rahul.k@college.edu / Student@1234");
+    console.log("✅ Student: rahulk.cs.25@nitj.ac.in / Student@1234");
   }
 
   // Second student (to make the dashboard more interesting)
-  const student2Email = "priya.s@college.edu";
+  const student2Email = "priyas.ec.25@nitj.ac.in";
   let student2 = await prisma.user.findUnique({ where: { email: student2Email } });
   if (!student2) {
     student2 = await prisma.user.create({
@@ -58,30 +58,27 @@ async function main() {
         amount_due: 15000,
       },
     });
-    console.log("✅ Student: priya.s@college.edu / Student@1234 (defaulter)");
+    console.log("✅ Student: priyas.ec.25@nitj.ac.in / Student@1234 (defaulter)");
   }
 
-  // Today's menus
+  // Tomorrow's menus (so polls remain open for testing regardless of time of day)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today.getTime() + 86400000);
+  const nextDay = new Date(tomorrow.getTime() + 86400000);
 
   const existingMenus = await prisma.menu.count({
-    where: { meal_date: { gte: today, lt: tomorrow } },
+    where: { meal_date: { gte: tomorrow, lt: nextDay } },
   });
 
   if (existingMenus === 0) {
-    const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
-
-    // Set serve times in the FUTURE so polls/dashboard work
-    const now = new Date();
-    const hour = now.getHours();
+    const y = tomorrow.getFullYear(), m = tomorrow.getMonth(), d = tomorrow.getDate();
 
     const menus = [
-      { type: "BREAKFAST", items: ["Poha", "Boiled Eggs", "Bread & Butter", "Chai"], hour: Math.max(hour + 1, 8) },
-      { type: "LUNCH", items: ["Rice", "Dal Tadka", "Mix Veg", "Roti", "Salad"], hour: Math.max(hour + 2, 13) },
-      { type: "SNACKS", items: ["Samosa", "Chai", "Biscuits"], hour: Math.max(hour + 3, 17) },
-      { type: "DINNER", items: ["Paneer Butter Masala", "Rice", "Roti", "Raita", "Gulab Jamun"], hour: Math.max(hour + 4, 20) },
+      { type: "BREAKFAST", items: ["Poha", "Boiled Eggs", "Bread & Butter", "Chai"], hour: 8 },
+      { type: "LUNCH", items: ["Rice", "Dal Tadka", "Mix Veg", "Roti", "Salad"], hour: 13 },
+      { type: "SNACKS", items: ["Samosa", "Chai", "Biscuits"], hour: 17 },
+      { type: "DINNER", items: ["Paneer Butter Masala", "Rice", "Roti", "Raita", "Gulab Jamun"], hour: 20 },
     ];
 
     for (const menu of menus) {
@@ -90,7 +87,7 @@ async function main() {
 
       await prisma.menu.create({
         data: {
-          meal_date: today,
+          meal_date: tomorrow,
           meal_type: menu.type,
           items: JSON.stringify(menu.items),
           serve_time,
@@ -98,7 +95,7 @@ async function main() {
         },
       });
     }
-    console.log("✅ Today's menus seeded (Breakfast, Lunch, Snacks, Dinner)");
+    console.log("✅ Tomorrow's menus seeded with open polls (Breakfast, Lunch, Snacks, Dinner)");
   }
 
   console.log("\n🌱 Done!");

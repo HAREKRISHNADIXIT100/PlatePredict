@@ -49,9 +49,10 @@ router.get("/dashboard", async (req, res, next) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today.getTime() + 86400000);
+    const nextDay = new Date(tomorrow.getTime() + 86400000);
 
     const menus = await prisma.menu.findMany({
-      where: { meal_date: { gte: today, lt: tomorrow } },
+      where: { meal_date: { gte: today, lt: nextDay } },
       orderBy: { serve_time: "asc" },
       include: {
         polls: {
@@ -61,13 +62,14 @@ router.get("/dashboard", async (req, res, next) => {
       },
     });
 
-    const today_menu = await Promise.all(
+    const upcoming_menus = await Promise.all(
       menus.map(async (menu) => {
         const locked = await isPollLocked(menu);
         const studentPoll = menu.polls[0] || null;
         return {
           menu_id: menu.id,
           meal_type: menu.meal_type,
+          meal_date: menu.meal_date,
           items: parseItems(menu.items),
           serve_time: menu.serve_time,
           poll_cutoff_time: menu.poll_cutoff_time,
@@ -90,7 +92,7 @@ router.get("/dashboard", async (req, res, next) => {
         amount_due: user.amount_due,
       },
       meals_consumed: mealsConsumed,
-      today_menu,
+      upcoming_menus,
     });
   } catch (err) { next(err); }
 });

@@ -54,12 +54,15 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("Student@1234", 12);
 
+  const BRANCHES = ["cs", "ec", "me", "ce", "ee", "it", "ch", "bt", "ice", "ipe"];
+
   // ── 1. Create 50 students ─────────────────────────────────────────────────
   const students = [];
   for (let i = 0; i < 50; i++) {
     const firstName = FIRST_NAMES[i];
     const lastName = LAST_NAMES[i % LAST_NAMES.length];
-    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@college.edu`;
+    const branch = BRANCHES[i % BRANCHES.length];
+    const email = `${firstName.toLowerCase()}${lastName[0].toLowerCase()}.${branch}.25@nitj.ac.in`;
     const hostel = HOSTELS[i % HOSTELS.length];
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -207,6 +210,28 @@ async function main() {
   }
 
   console.log(`\n✅ ${menusCreated} historical menus with polls, attendance & tokens created`);
+
+  // ── 6. Sync Balances based on actual attendance ───────────────────────────
+  console.log("   Syncing real user balances based on meal attendance...");
+  for (const student of allStudents) {
+    const agg = await prisma.mealAttendance.aggregate({
+      where: { student_id: student.id },
+      _sum: { deduction_amount: true },
+    });
+    
+    const consumed = agg._sum.deduction_amount || 0;
+    const realBalance = student.advance_paid - consumed;
+    const isDue = realBalance < 0;
+    
+    await prisma.user.update({
+      where: { id: student.id },
+      data: {
+        current_balance: realBalance,
+        fee_due_status: isDue,
+        amount_due: isDue ? Math.abs(realBalance) : 0,
+      },
+    });
+  }
 
   // ── Summary ────────────────────────────────────────────────────────────────
   const [totalStudents, totalMenus, totalPolls, totalAttendance, totalTokens] = await Promise.all([

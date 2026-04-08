@@ -44,7 +44,7 @@ export default function Register() {
           </div>
           <div className="form-group">
             <label className="form-label">College Email</label>
-            <input id="register-email" type="email" className="form-input" placeholder="rahul.k@college.edu" value={form.email} onChange={(e) => update('email', e.target.value)} required />
+            <input id="register-email" type="email" className="form-input" placeholder="rahulk.cs.25@nitj.ac.in" value={form.email} onChange={(e) => update('email', e.target.value)} required />
           </div>
           <div className="form-group">
             <label className="form-label">Hostel ID</label>

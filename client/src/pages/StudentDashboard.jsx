@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import QRCode from 'react-qr-code';
 import { api } from '../api';
 
 const MEAL_ICONS = {
@@ -88,7 +89,63 @@ export default function StudentDashboard() {
   if (error && !data) return <div className="alert alert-error">{error}</div>;
   if (!data) return <div style={{ color: 'var(--text-muted)', padding: 40 }}>Loading dashboard...</div>;
 
-  const { profile, financials, meals_consumed, today_menu } = data;
+  const { profile, financials, meals_consumed, upcoming_menus } = data;
+
+  const todayStr = new Date().toDateString();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toDateString();
+
+  const todayMenus = (upcoming_menus || []).filter(m => new Date(m.meal_date).toDateString() === todayStr);
+  const tomorrowMenus = (upcoming_menus || []).filter(m => new Date(m.meal_date).toDateString() === tomorrowStr);
+
+  const renderMealCard = (meal) => (
+    <div className="meal-card" key={meal.menu_id}>
+      <div className="meal-card-header">
+        <div className="meal-type">
+          {MEAL_ICONS[meal.meal_type]} {meal.meal_type}
+          <span style={{ fontWeight: 400, fontSize: '0.82rem', color: 'var(--text-dim)' }}>
+            {formatTime(meal.serve_time)}
+          </span>
+        </div>
+        <CountdownTimer cutoffTime={meal.poll_cutoff_time} locked={meal.poll_locked} />
+      </div>
+
+      <div className="meal-items">
+        {(Array.isArray(meal.items) ? meal.items : []).map((item, i) => (
+          <span className="meal-item-tag" key={i}>{item}</span>
+        ))}
+      </div>
+
+      <div className="poll-actions">
+        <button
+          className={`poll-btn ${meal.student_intention === 'YES' ? 'yes-active' : ''}`}
+          onClick={() => handlePoll(meal.menu_id, 'YES')}
+          disabled={meal.poll_locked || pollLoading[meal.menu_id]}
+        >
+          ✓ Eating
+        </button>
+        <button
+          className={`poll-btn ${meal.student_intention === 'NO' ? 'no-active' : ''}`}
+          onClick={() => handlePoll(meal.menu_id, 'NO')}
+          disabled={meal.poll_locked || pollLoading[meal.menu_id]}
+        >
+          ✕ Skipping
+        </button>
+      </div>
+
+      {meal.snack_token && meal.snack_token.status === 'ISSUED' && (
+        <div className="token-display" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 12, fontWeight: 600 }}>SNACK TOKEN QR</div>
+          <div style={{ background: 'white', padding: '12px', display: 'inline-block', borderRadius: '8px' }}>
+            <QRCode value={`${window.location.origin}/manager/tokens?search=${meal.snack_token.token_code}`} size={120} level="H" />
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8, letterSpacing: '1px' }}>{meal.snack_token.token_code}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 6 }}>Scan this at the mess counter</div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -132,52 +189,25 @@ export default function StudentDashboard() {
       <div style={{ marginBottom: 12 }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 16 }}>Today's Meals</h2>
       </div>
-
-      {today_menu.map((meal) => (
-        <div className="meal-card" key={meal.menu_id}>
-          <div className="meal-card-header">
-            <div className="meal-type">
-              {MEAL_ICONS[meal.meal_type]} {meal.meal_type}
-              <span style={{ fontWeight: 400, fontSize: '0.82rem', color: 'var(--text-dim)' }}>
-                {formatTime(meal.serve_time)}
-              </span>
-            </div>
-            <CountdownTimer cutoffTime={meal.poll_cutoff_time} locked={meal.poll_locked} />
-          </div>
-
-          <div className="meal-items">
-            {(Array.isArray(meal.items) ? meal.items : []).map((item, i) => (
-              <span className="meal-item-tag" key={i}>{item}</span>
-            ))}
-          </div>
-
-          <div className="poll-actions">
-            <button
-              className={`poll-btn ${meal.student_intention === 'YES' ? 'yes-active' : ''}`}
-              onClick={() => handlePoll(meal.menu_id, 'YES')}
-              disabled={meal.poll_locked || pollLoading[meal.menu_id]}
-            >
-              ✓ Eating
-            </button>
-            <button
-              className={`poll-btn ${meal.student_intention === 'NO' ? 'no-active' : ''}`}
-              onClick={() => handlePoll(meal.menu_id, 'NO')}
-              disabled={meal.poll_locked || pollLoading[meal.menu_id]}
-            >
-              ✕ Skipping
-            </button>
-          </div>
-
-          {/* Show snack token if voted NO */}
-          {meal.snack_token && meal.snack_token.status === 'ISSUED' && (
-            <div className="token-display">
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600 }}>SNACK TOKEN</div>
-              <div className="token-code">{meal.snack_token.token_code}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 6 }}>Show this to the mess counter</div>
-            </div>
-          )}
+      {todayMenus.length === 0 ? (
+        <div className="meal-card" style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
+          No more meals scheduled for today.
         </div>
-      ))}
+      ) : (
+        todayMenus.map(renderMealCard)
+      )}
+
+      {/* Tomorrow's Menu & Polls */}
+      <div style={{ marginBottom: 12, marginTop: 24 }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 16 }}>Tomorrow's Meals</h2>
+      </div>
+      {tomorrowMenus.length === 0 ? (
+        <div className="meal-card" style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
+          Tomorrow's menu has not been updated yet.
+        </div>
+      ) : (
+        tomorrowMenus.map(renderMealCard)
+      )}
 
       {error && <div className="alert alert-error" style={{ marginTop: 16 }}>{error}</div>}
     </>
