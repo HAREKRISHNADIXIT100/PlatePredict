@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: platepredict-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: ALLOWED_EMAIL_DOMAINS
+        value: nitj.ac.in
