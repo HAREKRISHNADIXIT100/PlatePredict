@@ -1,14 +1,14 @@
 // prisma/schema.prisma
 // Database URL is configured via DATABASE_URL in .env
-// Local dev: SQLite  →  DATABASE_URL="file:./dev.db"
-// Production: PostgreSQL  →  DATABASE_URL="postgresql://user:pass@host:5432/dbname"
+// Local dev: postgresql://postgres:password@localhost:5432/platepredict_dev
+// Production: postgresql://user:pass@railway-host:5432/railway
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

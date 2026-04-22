@@ -1,4 +1,8 @@
-const API = '/api/v1';
+// In production (Vercel), VITE_API_URL is set to the Railway backend URL.
+// In local dev, it's undefined and the Vite proxy handles /api/v1 → localhost:5000.
+const API = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api/v1`
+  : '/api/v1';
 
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('token');
