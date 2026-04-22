@@ -1,5 +1,10 @@
 // src/utils/email.util.js
+// Sends OTP and reminder emails via Nodemailer SMTP.
+// Errors are propagated so callers can return appropriate HTTP responses.
+
 const nodemailer = require("nodemailer");
+
+const isDev = () => process.env.NODE_ENV !== "production";
 
 // Create standard transporter using environment variables
 const transporter = nodemailer.createTransport({
@@ -14,14 +19,23 @@ const transporter = nodemailer.createTransport({
 
 // Helper to determine if SMTP looks configured
 const isSmtpConfigured = () => {
-  return process.env.SMTP_USER && process.env.SMTP_USER !== "your-email@gmail.com" 
+  return process.env.SMTP_USER && process.env.SMTP_USER !== "your-email@gmail.com"
       && process.env.SMTP_PASS && process.env.SMTP_PASS !== "your-app-password";
 };
 
 async function sendOtpEmail(email, otpCode, name) {
+  // In dev mode, always log OTP to console so testing works regardless of SMTP
+  if (isDev()) {
+    console.log(`\n📧 [DEV] OTP for ${name} (${email}): ${otpCode}\n`);
+  }
+
   if (!isSmtpConfigured()) {
-    console.log(`\n📧 [EMAIL STUB] OTP for ${name} (${email}): ${otpCode}\n`);
-    return;
+    if (isDev()) {
+      console.warn("⚠️  SMTP not configured — OTP logged to console above. Email NOT sent.");
+      return; // Allow dev flow to continue without real email
+    }
+    // In production, fail hard — email MUST be configured
+    throw new Error("Email service is not configured. Please contact support.");
   }
 
   try {
@@ -44,15 +58,22 @@ async function sendOtpEmail(email, otpCode, name) {
     console.log(`✅ [Nodemailer] Sent OTP to ${email}`);
   } catch (error) {
     console.error("❌ [Nodemailer Error] Failed to send OTP via SMTP:", error.message);
-    // Fallback to log so dev flow isn't completely broken
-    console.log(`\n📧 [EMAIL STUB FALLBACK] OTP for ${name} (${email}): ${otpCode}\n`);
+    if (isDev()) {
+      console.warn("⚠️  Email delivery failed, but OTP was logged to console above. Continuing in dev mode.");
+      return; // Don't block dev flow — OTP is already in console
+    }
+    // In production, propagate the error so the API returns a clear failure
+    throw new Error("Failed to send verification email. Please try again later.");
   }
 }
 
 async function sendReminderEmail(email, name, amountDue) {
   if (!isSmtpConfigured()) {
-    console.log(`\n📧 [EMAIL STUB] Reminder to ${name} (${email}): ₹${amountDue} due\n`);
-    return;
+    if (isDev()) {
+      console.log(`\n📧 [DEV STUB] Reminder to ${name} (${email}): ₹${amountDue} due\n`);
+      return;
+    }
+    throw new Error("Email service is not configured.");
   }
 
   try {
@@ -65,6 +86,8 @@ async function sendReminderEmail(email, name, amountDue) {
     console.log(`✅ [Nodemailer] Sent Reminder to ${email}`);
   } catch (error) {
     console.error("❌ [Nodemailer Error] Failed to send reminder:", error.message);
+    // Propagate so the remind endpoint can report individual failures
+    throw new Error(`Failed to send reminder to ${email}.`);
   }
 }
 

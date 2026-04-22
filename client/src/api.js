@@ -37,8 +37,6 @@ export const api = {
   // Manager
   upcomingMeal: () => request('/manager/dashboard/upcoming-meal'),
   aiPredict: (menuId) => request(`/manager/ai/predict?menu_id=${menuId}`),
-  activeTokens: (search = '') => request(`/manager/tokens/active?search=${search}`),
-  redeemToken: (token_code) => request('/manager/tokens/redeem', { method: 'PUT', body: { token_code } }),
   defaulters: () => request('/manager/defaulters'),
   remindDefaulters: (student_ids) => request('/manager/defaulters/remind', { method: 'POST', body: { student_ids } }),
   getMenus: (date) => request(`/manager/menus${date ? `?date=${date}` : ''}`),
@@ -46,4 +44,10 @@ export const api = {
   updateMenu: (id, body) => request(`/manager/menus/${id}`, { method: 'PUT', body }),
   deleteMenu: (id) => request(`/manager/menus/${id}`, { method: 'DELETE' }),
   recordAttendance: (body) => request('/manager/attendance/record', { method: 'POST', body }),
+  getAttendanceList: (menu_id) => request(`/manager/attendance?menu_id=${menu_id}`),
+  
+  // Leaves
+  searchStudents: (query) => request(`/manager/students/search?q=${query}`),
+  getLeaves: () => request('/manager/leaves'),
+  createLeave: (body) => request('/manager/leaves', { method: 'POST', body }),
 };

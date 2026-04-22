@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import QRCode from 'react-qr-code';
 import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const MEAL_ICONS = {
   BREAKFAST: '🌅',
@@ -37,6 +38,7 @@ function CountdownTimer({ cutoffTime, locked }) {
 }
 
 export default function StudentDashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [pollLoading, setPollLoading] = useState({});
@@ -89,15 +91,15 @@ export default function StudentDashboard() {
   if (error && !data) return <div className="alert alert-error">{error}</div>;
   if (!data) return <div style={{ color: 'var(--text-muted)', padding: 40 }}>Loading dashboard...</div>;
 
-  const { profile, financials, meals_consumed, upcoming_menus } = data;
+  const { profile, financials, meals_consumed, upcoming_menus, reward_points, no_show_violations } = data;
 
   const todayStr = new Date().toDateString();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toDateString();
 
-  const todayMenus = (upcoming_menus || []).filter(m => new Date(m.meal_date).toDateString() === todayStr);
-  const tomorrowMenus = (upcoming_menus || []).filter(m => new Date(m.meal_date).toDateString() === tomorrowStr);
+  const todayMenus = (upcoming_menus || []).filter(m => new Date(m.serve_time).toDateString() === todayStr);
+  const tomorrowMenus = (upcoming_menus || []).filter(m => new Date(m.serve_time).toDateString() === tomorrowStr);
 
   const renderMealCard = (meal) => (
     <div className="meal-card" key={meal.menu_id}>
@@ -121,29 +123,18 @@ export default function StudentDashboard() {
         <button
           className={`poll-btn ${meal.student_intention === 'YES' ? 'yes-active' : ''}`}
           onClick={() => handlePoll(meal.menu_id, 'YES')}
-          disabled={meal.poll_locked || pollLoading[meal.menu_id]}
+          disabled={meal.poll_locked || pollLoading[meal.menu_id] || data.on_leave}
         >
           ✓ Eating
         </button>
         <button
           className={`poll-btn ${meal.student_intention === 'NO' ? 'no-active' : ''}`}
           onClick={() => handlePoll(meal.menu_id, 'NO')}
-          disabled={meal.poll_locked || pollLoading[meal.menu_id]}
+          disabled={meal.poll_locked || pollLoading[meal.menu_id] || data.on_leave}
         >
           ✕ Skipping
         </button>
       </div>
-
-      {meal.snack_token && meal.snack_token.status === 'ISSUED' && (
-        <div className="token-display" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 12, fontWeight: 600 }}>SNACK TOKEN QR</div>
-          <div style={{ background: 'white', padding: '12px', display: 'inline-block', borderRadius: '8px' }}>
-            <QRCode value={`${window.location.origin}/manager/tokens?search=${meal.snack_token.token_code}`} size={120} level="H" />
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8, letterSpacing: '1px' }}>{meal.snack_token.token_code}</div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 6 }}>Scan this at the mess counter</div>
-        </div>
-      )}
     </div>
   );
 
@@ -153,6 +144,38 @@ export default function StudentDashboard() {
         <h1>Good {getGreeting()}, {profile.name?.split(' ')[0]} 👋</h1>
         <p>Here's your mess overview for today</p>
       </div>
+
+      {/* Violation Warning Banner */}
+      {no_show_violations > 3 && (
+        <div className="alert alert-error" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: '1.4rem' }}>⚠️</span>
+          <div>
+            <strong>Warning!</strong> You have polled "NO" but showed up <strong>{no_show_violations} times</strong> this month (limit: 3). 
+            Each additional violation deducts <strong>20 reward points</strong>. Please poll honestly.
+          </div>
+        </div>
+      )}
+
+      {/* Leave Suspended Banner */}
+      {data.on_leave ? (
+        <div className="alert alert-error" style={{ marginBottom: 24, padding: 24, textAlign: 'center' }}>
+          <h2 style={{ fontSize: '1.2rem', marginBottom: 8 }}>❌ Account Suspended (On Leave)</h2>
+          <p>Your mess account is temporarily suspended due to an active Leave of Absence. You cannot poll for meals or scan your QR code until you return.</p>
+        </div>
+      ) : (
+        /* Attendance QR Code */
+        <div className="meal-card" style={{ padding: '24px', textAlign: 'center', marginBottom: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>Your Attendance QR</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Scan this at the mess counter for your meals</p>
+          <div style={{ background: 'white', padding: '16px', display: 'inline-block', borderRadius: '12px', boxShadow: 'var(--shadow)' }}>
+            <QRCode value={JSON.stringify({ student_id: user?.id })} size={160} level="H" />
+          </div>
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>College / Hostel ID</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginTop: '4px' }}>{profile.hostel_id}</div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Widget */}
       {financials.fee_due_status && (
@@ -167,7 +190,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Financial Cards */}
+      {/* Financial & Stats Cards */}
       <div className="card-grid">
         <div className="stat-card">
           <div className="stat-label">Advance Paid</div>
@@ -182,6 +205,11 @@ export default function StudentDashboard() {
         <div className="stat-card">
           <div className="stat-label">Meals Consumed</div>
           <div className="stat-value">{meals_consumed}</div>
+        </div>
+        <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(187, 148, 87, 0.15), rgba(255, 230, 167, 0.08))', border: '1px solid rgba(187, 148, 87, 0.3)' }}>
+          <div className="stat-label" style={{ color: '#bb9457' }}>🏆 Reward Points</div>
+          <div className="stat-value" style={{ color: '#ffe6a7' }}>{reward_points || 0}</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: 4 }}>1 pt = ₹1</div>
         </div>
       </div>
 

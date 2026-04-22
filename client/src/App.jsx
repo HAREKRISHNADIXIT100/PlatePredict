@@ -6,9 +6,10 @@ import VerifyOtp from './pages/VerifyOtp';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentHistory from './pages/StudentHistory';
 import ManagerDashboard from './pages/ManagerDashboard';
-import ManagerTokens from './pages/ManagerTokens';
 import ManagerDefaulters from './pages/ManagerDefaulters';
 import ManagerMenus from './pages/ManagerMenus';
+import ManagerAttendance from './pages/ManagerAttendance';
+import ManagerLeaves from './pages/ManagerLeaves';
 import AppLayout from './components/AppLayout';
 
 function ProtectedRoute({ children, role }) {
@@ -50,11 +51,6 @@ export default function App() {
           <AppLayout><ManagerDashboard /></AppLayout>
         </ProtectedRoute>
       } />
-      <Route path="/manager/tokens" element={
-        <ProtectedRoute role="MANAGER">
-          <AppLayout><ManagerTokens /></AppLayout>
-        </ProtectedRoute>
-      } />
       <Route path="/manager/defaulters" element={
         <ProtectedRoute role="MANAGER">
           <AppLayout><ManagerDefaulters /></AppLayout>
@@ -63,6 +59,16 @@ export default function App() {
       <Route path="/manager/menus" element={
         <ProtectedRoute role="MANAGER">
           <AppLayout><ManagerMenus /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/manager/attendance" element={
+        <ProtectedRoute role="MANAGER">
+          <AppLayout><ManagerAttendance /></AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/manager/leaves" element={
+        <ProtectedRoute role="MANAGER">
+          <AppLayout><ManagerLeaves /></AppLayout>
         </ProtectedRoute>
       } />
 

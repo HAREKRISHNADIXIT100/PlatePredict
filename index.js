@@ -5,11 +5,11 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 
-const authRoutes = require("./routes/auth.routes");
-const studentRoutes = require("./routes/student.routes");
-const managerRoutes = require("./routes/manager.routes");
-const webhookRoutes = require("./routes/webhook.routes");
-const { startAllCronJobs } = require("./cron/token_expiry");
+const authRoutes = require("./auth.routes");
+const studentRoutes = require("./student.routes");
+const managerRoutes = require("./manager.routes");
+const webhookRoutes = require("./webhook.routes");
+const { startAllCronJobs } = require("./token_expiry");
 
 const app = express();
 const PORT = process.env.PORT || 5000;

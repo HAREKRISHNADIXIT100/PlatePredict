@@ -42,7 +42,7 @@ export default function Login() {
               id="login-email"
               type="email"
               className="form-input"
-              placeholder="harek.cs.25@nitj.ac.in"
+              placeholder="vikasb.ec.25@nitj.ac.in"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

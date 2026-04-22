@@ -8,9 +8,33 @@ const { sendReminderEmail } = require("../utils/email.util");
 
 router.use(authenticate, requireManager);
 
+const MEAL_PRICES = {
+  BREAKFAST: 40,
+  LUNCH: 60,
+  SNACKS: 20,
+  DINNER: 60,
+};
+
 function parseItems(items) {
   if (Array.isArray(items)) return items;
   try { return JSON.parse(items); } catch { return []; }
+}
+
+/**
+ * Compute the poll cutoff time for a given meal.
+ * - BREAKFAST: 10 PM the previous night (students vote during the evening)
+ * - All others: serve_time minus 4 hours
+ */
+function computePollCutoff(serveDate, mealType) {
+  if (mealType === "BREAKFAST") {
+    // 10 PM the previous day
+    const cutoff = new Date(serveDate);
+    cutoff.setDate(cutoff.getDate() - 1);
+    cutoff.setHours(22, 0, 0, 0);
+    return cutoff;
+  }
+  // Default: 4 hours before serve time
+  return new Date(serveDate.getTime() - 4 * 60 * 60 * 1000);
 }
 
 // GET /manager/dashboard/upcoming-meal
@@ -44,7 +68,7 @@ router.get("/dashboard/upcoming-meal", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /manager/ai/predict?menu_id=xxx — simplified for SQLite (no materialized view)
+// GET /manager/ai/predict?menu_id=xxx
 router.get("/ai/predict", async (req, res, next) => {
   try {
     const { menu_id } = req.query;
@@ -55,7 +79,6 @@ router.get("/ai/predict", async (req, res, next) => {
 
     const yesVotes = await prisma.poll.count({ where: { menu_id, intention: "YES" } });
 
-    // Compute deviation from past completed meals
     const pastMenus = await prisma.menu.findMany({
       where: { serve_time: { lt: new Date() }, meal_type: menu.meal_type },
       include: {
@@ -100,68 +123,6 @@ router.get("/ai/predict", async (req, res, next) => {
         overall_baseline: { deviation: `${DEFAULT_DEVIATION.toFixed(1)}%`, weight: "15%", samples: deviationCount },
       },
     });
-  } catch (err) { next(err); }
-});
-
-// GET /manager/tokens/active?search=
-router.get("/tokens/active", async (req, res, next) => {
-  try {
-    const now = new Date();
-    const { search } = req.query;
-
-    const nextMenu = await prisma.menu.findFirst({
-      where: { serve_time: { gt: now } },
-      orderBy: { serve_time: "asc" },
-    });
-
-    if (!nextMenu) return res.status(404).json({ error: "No active meal window." });
-
-    const whereClause = { status: "ISSUED", poll: { menu_id: nextMenu.id } };
-    if (search && search.trim()) {
-      whereClause.OR = [
-        { student: { name: { contains: search.trim() } } },
-        { token_code: { contains: search.trim() } }
-      ];
-    }
-
-    const tokens = await prisma.snackToken.findMany({
-      where: whereClause,
-      include: { student: { select: { name: true, email: true, hostel_id: true } } },
-    });
-
-    res.json({
-      menu_id: nextMenu.id,
-      meal_type: nextMenu.meal_type,
-      serve_time: nextMenu.serve_time,
-      total_tokens: tokens.length,
-      eligible_students: tokens.map((t) => ({
-        student_name: t.student.name,
-        email: t.student.email,
-        hostel_id: t.student.hostel_id,
-        token_code: t.token_code,
-        status: t.status,
-      })),
-    });
-  } catch (err) { next(err); }
-});
-
-// PUT /manager/tokens/redeem
-router.put("/tokens/redeem", async (req, res, next) => {
-  try {
-    const { token_code } = req.body;
-    if (!token_code) return res.status(400).json({ error: "token_code is required." });
-
-    const token = await prisma.snackToken.findUnique({ where: { token_code } });
-    if (!token) return res.status(404).json({ error: "Token not found." });
-    if (token.status === "REDEEMED") return res.status(409).json({ error: "Already redeemed." });
-    if (token.status === "EXPIRED") return res.status(410).json({ error: "Token expired." });
-
-    await prisma.snackToken.update({
-      where: { token_code },
-      data: { status: "REDEEMED", redeemed_at: new Date() },
-    });
-
-    res.json({ message: "Token redeemed successfully." });
   } catch (err) { next(err); }
 });
 
@@ -239,7 +200,7 @@ router.post("/menus", [
   try {
     const { meal_date, meal_type, items, serve_time } = req.body;
     const serveDate = new Date(serve_time);
-    const pollCutoff = new Date(serveDate.getTime() - 4 * 60 * 60 * 1000);
+    const pollCutoff = computePollCutoff(serveDate, meal_type);
 
     const menu = await prisma.menu.create({
       data: { meal_date: new Date(meal_date), meal_type, items: JSON.stringify(items), serve_time: serveDate, poll_cutoff_time: pollCutoff },
@@ -261,8 +222,10 @@ router.put("/menus/:id", async (req, res, next) => {
     const updateData = {};
     if (items) updateData.items = JSON.stringify(items);
     if (serve_time) {
-      updateData.serve_time = new Date(serve_time);
-      updateData.poll_cutoff_time = new Date(new Date(serve_time).getTime() - 4 * 60 * 60 * 1000);
+      const newServeDate = new Date(serve_time);
+      updateData.serve_time = newServeDate;
+      // Re-derive meal_type from existing record to compute correct cutoff
+      updateData.poll_cutoff_time = computePollCutoff(newServeDate, existing.meal_type);
     }
 
     const updated = await prisma.menu.update({ where: { id }, data: updateData });
@@ -281,6 +244,31 @@ router.delete("/menus/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /manager/attendance?menu_id=xxx
+router.get("/attendance", async (req, res, next) => {
+  try {
+    const { menu_id } = req.query;
+    if (!menu_id) return res.status(400).json({ error: "menu_id is required." });
+
+    const attendanceList = await prisma.mealAttendance.findMany({
+      where: { menu_id },
+      include: {
+        student: { select: { name: true, hostel_id: true } },
+      },
+      orderBy: { scanned_at: "desc" },
+    });
+
+    res.json(attendanceList.map(item => ({
+      id: item.id,
+      student_id: item.student_id,
+      name: item.student.name,
+      hostel_id: item.student.hostel_id,
+      deduction_amount: item.deduction_amount,
+      scanned_at: item.scanned_at,
+    })));
+  } catch (err) { next(err); }
+});
+
 // POST /manager/attendance/record
 router.post("/attendance/record", [
   body("student_id").notEmpty(),
@@ -293,18 +281,153 @@ router.post("/attendance/record", [
   try {
     const { student_id, menu_id, deduction_amount } = req.body;
 
-    const alreadyRecorded = await prisma.mealAttendance.findFirst({ where: { student_id, menu_id } });
-    if (alreadyRecorded) return res.status(409).json({ error: "Already recorded." });
+    const menu = await prisma.menu.findUnique({ where: { id: menu_id } });
+    if (!menu) return res.status(404).json({ error: "Menu not found." });
 
-    const record = await prisma.mealAttendance.create({ data: { student_id, menu_id, deduction_amount } });
+    // Check if student is on leave for this meal date
+    const overlappingLeave = await prisma.leave.findFirst({
+      where: {
+        student_id,
+        start_date: { lte: menu.meal_date },
+        end_date: { gte: menu.meal_date },
+      },
+    });
+    if (overlappingLeave) return res.status(403).json({ error: "Student is on leave for this meal. Scan rejected." });
 
-    // Manual balance deduction (SQLite has no triggers)
+    const alreadyRecorded = await prisma.mealAttendance.findFirst({ 
+      where: { student_id, menu_id },
+      include: { student: { select: { name: true } } }
+    });
+    if (alreadyRecorded) return res.status(409).json({ error: `${alreadyRecorded.student.name} is already recorded.` });
+
+    const record = await prisma.mealAttendance.create({
+      data: { student_id, menu_id, deduction_amount },
+      include: { student: { select: { name: true, hostel_id: true } } }
+    });
+
+    // Balance deduction
     await prisma.user.update({
       where: { id: student_id },
       data: { current_balance: { decrement: deduction_amount } },
     });
 
-    res.status(201).json({ message: "Attendance recorded.", record });
+    // ── Violation check: student polled NO but showed up ──
+    let warning = null;
+    const poll = await prisma.poll.findFirst({ where: { student_id, menu_id } });
+
+    if (poll && poll.intention === "NO") {
+      // Count violations this month
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+      const noPolls = await prisma.poll.findMany({
+        where: {
+          student_id,
+          intention: "NO",
+          menu: { meal_date: { gte: monthStart, lt: monthEnd } },
+        },
+        select: { menu_id: true },
+      });
+
+      let violationCount = 0;
+      for (const np of noPolls) {
+        const attended = await prisma.mealAttendance.findFirst({
+          where: { student_id, menu_id: np.menu_id },
+        });
+        if (attended) violationCount++;
+      }
+
+      if (violationCount > 3) {
+        // Fine the student 20 reward points
+        await prisma.user.update({
+          where: { id: student_id },
+          data: { reward_points: { decrement: 20 } },
+        });
+
+        await prisma.rewardLog.create({
+          data: {
+            student_id,
+            menu_id,
+            points: -20,
+            reason: "NO_SHOW_VIOLATION_FINE",
+          },
+        });
+
+        warning = `⚠️ ${record.student.name} polled NO but showed up! This is violation #${violationCount} this month. 20 reward points deducted.`;
+      } else {
+        warning = `⚠️ ${record.student.name} polled NO but showed up. Violation #${violationCount}/3 this month. No fine yet.`;
+      }
+    }
+
+    res.status(201).json({ message: "Attendance recorded.", record, warning });
+  } catch (err) { next(err); }
+});
+
+// (module.exports moved to the bottom of the file so all routes are registered)
+
+// ── Leave Management ─────────────────────────────────────────────────────────
+
+// GET /manager/students/search?q=
+router.get("/students/search", async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.length < 2) return res.json([]);
+    const students = await prisma.user.findMany({
+      where: { role: "STUDENT", OR: [{ name: { contains: q } }, { hostel_id: { contains: q } }, { email: { contains: q } }] },
+      select: { id: true, name: true, hostel_id: true, email: true },
+      take: 10,
+    });
+    res.json(students);
+  } catch (err) { next(err); }
+});
+
+// GET /manager/leaves
+router.get("/leaves", async (req, res, next) => {
+  try {
+    const leaves = await prisma.leave.findMany({
+      include: { student: { select: { name: true, hostel_id: true, email: true } } },
+      orderBy: { created_at: "desc" },
+    });
+    res.json(leaves);
+  } catch (err) { next(err); }
+});
+
+// POST /manager/leaves
+router.post("/leaves", [
+  body("student_id").notEmpty(),
+  body("start_date").notEmpty(),
+  body("end_date").notEmpty(),
+], async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  try {
+    const { student_id, start_date, end_date } = req.body;
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    
+    // Validate dates
+    if (start > end) return res.status(400).json({ error: "Start date must be before end date." });
+
+    // Ensure they don't have overlapping leaves
+    const overlap = await prisma.leave.findFirst({
+      where: {
+        student_id,
+        OR: [
+          { start_date: { lte: end }, end_date: { gte: start } },
+        ],
+      },
+    });
+
+    if (overlap) return res.status(409).json({ error: "Student already has an overlapping leave during this period." });
+
+    const newLeave = await prisma.leave.create({
+      data: { student_id, start_date: start, end_date: end },
+      include: { student: { select: { name: true, hostel_id: true } } },
+    });
+
+    res.status(201).json({ message: "Leave assigned.", leave: newLeave });
   } catch (err) { next(err); }
 });
 

@@ -2,10 +2,10 @@
   "name": "platepredict-backend",
   "version": "1.0.0",
   "description": "Mess Management & AI Optimization App — Backend API",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
+    "dev": "nodemon index.js",
+    "start": "node index.js",
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:generate": "npx prisma generate",
     "prisma:seed": "node prisma/seed.js",

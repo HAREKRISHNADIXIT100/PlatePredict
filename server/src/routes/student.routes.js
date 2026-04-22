@@ -4,7 +4,6 @@ const router = express.Router();
 const { body, validationResult } = require("express-validator");
 const prisma = require("../config/prisma");
 const { authenticate, requireStudent } = require("../middleware/auth.middleware");
-const crypto = require("crypto");
 
 router.use(authenticate, requireStudent);
 
@@ -15,25 +14,14 @@ function parseItems(items) {
 
 async function isPollLocked(menu) {
   const now = new Date();
-  if (now >= new Date(menu.poll_cutoff_time)) return true;
 
-  if (menu.meal_type === "BREAKFAST") {
-    const mealDate = new Date(menu.meal_date);
-    const prevDay = new Date(mealDate);
-    prevDay.setDate(prevDay.getDate() - 1);
-    prevDay.setHours(0, 0, 0, 0);
-    const nextDay = new Date(prevDay.getTime() + 86400000);
-
-    const previousDinner = await prisma.menu.findFirst({
-      where: { meal_type: "DINNER", meal_date: { gte: prevDay, lt: nextDay } },
-      select: { serve_time: true },
-    });
-
-    if (previousDinner) {
-      const dinnerConclusion = new Date(new Date(previousDinner.serve_time).getTime() + 2 * 60 * 60 * 1000);
-      if (now < dinnerConclusion) return true;
-    }
+  // Simple check: if current time is past the poll cutoff, the poll is locked.
+  // For breakfast, poll_cutoff_time is set to 10 PM previous night at menu creation.
+  // For other meals, poll_cutoff_time is set to serve_time - 4 hours at menu creation.
+  if (now >= new Date(menu.poll_cutoff_time)) {
+    return true;
   }
+
   return false;
 }
 
@@ -43,7 +31,15 @@ router.get("/dashboard", async (req, res, next) => {
     const studentId = req.user.id;
     const user = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { name: true, hostel_id: true, advance_paid: true, current_balance: true, fee_due_status: true, amount_due: true },
+      select: { name: true, hostel_id: true, advance_paid: true, current_balance: true, fee_due_status: true, amount_due: true, reward_points: true },
+    });
+
+    const activeLeave = await prisma.leave.findFirst({
+      where: {
+        student_id: studentId,
+        start_date: { lte: new Date() },
+        end_date: { gte: new Date() },
+      },
     });
 
     const today = new Date();
@@ -57,7 +53,7 @@ router.get("/dashboard", async (req, res, next) => {
       include: {
         polls: {
           where: { student_id: studentId },
-          select: { intention: true, snack_token: { select: { token_code: true, status: true } } },
+          select: { intention: true },
         },
       },
     });
@@ -76,12 +72,32 @@ router.get("/dashboard", async (req, res, next) => {
           poll_locked: locked,
           student_voted: !!studentPoll,
           student_intention: studentPoll?.intention || null,
-          snack_token: studentPoll?.snack_token || null,
         };
       })
     );
 
     const mealsConsumed = await prisma.mealAttendance.count({ where: { student_id: studentId } });
+
+    // Count NO-poll + attended violations this month
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+
+    const noPolls = await prisma.poll.findMany({
+      where: {
+        student_id: studentId,
+        intention: "NO",
+        menu: { meal_date: { gte: monthStart, lt: monthEnd } },
+      },
+      select: { menu_id: true },
+    });
+
+    let noShowViolations = 0;
+    for (const poll of noPolls) {
+      const attended = await prisma.mealAttendance.findFirst({
+        where: { student_id: studentId, menu_id: poll.menu_id },
+      });
+      if (attended) noShowViolations++;
+    }
 
     res.json({
       profile: { name: user.name, hostel_id: user.hostel_id },
@@ -91,7 +107,10 @@ router.get("/dashboard", async (req, res, next) => {
         fee_due_status: user.fee_due_status,
         amount_due: user.amount_due,
       },
+      reward_points: user.reward_points,
       meals_consumed: mealsConsumed,
+      no_show_violations: noShowViolations,
+      on_leave: !!activeLeave,
       upcoming_menus,
     });
   } catch (err) { next(err); }
@@ -115,42 +134,22 @@ router.post("/poll", [
     const locked = await isPollLocked(menu);
     if (locked) return res.status(406).json({ error: "Poll is locked for this meal." });
 
-    const poll = await prisma.poll.upsert({
+    const overlappingLeave = await prisma.leave.findFirst({
+      where: {
+        student_id: studentId,
+        start_date: { lte: menu.meal_date },
+        end_date: { gte: menu.meal_date },
+      },
+    });
+    if (overlappingLeave) return res.status(403).json({ error: "Your account is on leave for this meal date." });
+
+    await prisma.poll.upsert({
       where: { student_id_menu_id: { student_id: studentId, menu_id } },
       update: { intention },
       create: { student_id: studentId, menu_id, intention },
     });
 
-    let snack_token_generated = false;
-    let token_data = null;
-
-    if (intention === "NO") {
-      const existing = await prisma.snackToken.findUnique({ where: { poll_id: poll.id } });
-      if (!existing) {
-        const token_code = `SNK-${crypto.randomBytes(3).toString("hex").toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-        await prisma.snackToken.create({
-          data: { student_id: studentId, poll_id: poll.id, token_code, status: "ISSUED" },
-        });
-        snack_token_generated = true;
-        token_data = { token_code, valid_for: menu.meal_type };
-      } else {
-        if (existing.status === "EXPIRED") {
-          await prisma.snackToken.update({
-            where: { id: existing.id },
-            data: { status: "ISSUED" }
-          });
-        }
-        snack_token_generated = true;
-        token_data = { token_code: existing.token_code, valid_for: menu.meal_type };
-      }
-    } else if (intention === "YES") {
-      await prisma.snackToken.updateMany({
-        where: { poll_id: poll.id, status: "ISSUED" },
-        data: { status: "EXPIRED" },
-      });
-    }
-
-    res.json({ message: "Poll recorded.", snack_token_generated, token_data });
+    res.json({ message: "Poll recorded." });
   } catch (err) { next(err); }
 });
 
@@ -184,26 +183,26 @@ router.get("/history", async (req, res, next) => {
     const limit = 20;
     const offset = (page - 1) * limit;
 
-    const [meals, tokens, payments, totalMeals, totalTokens, totalPayments] = await Promise.all([
+    const [meals, rewards, payments, totalMeals, totalRewards, totalPayments] = await Promise.all([
       prisma.mealAttendance.findMany({
         where: { student_id: studentId }, orderBy: { scanned_at: "desc" }, take: limit, skip: offset,
         include: { menu: { select: { meal_type: true, items: true, meal_date: true } } },
       }),
-      prisma.snackToken.findMany({
-        where: { student_id: studentId }, take: limit, skip: offset,
-        include: { poll: { select: { menu: { select: { meal_type: true, meal_date: true } } } } },
+      prisma.rewardLog.findMany({
+        where: { student_id: studentId }, orderBy: { created_at: "desc" }, take: limit, skip: offset,
+        include: { menu: { select: { meal_type: true, meal_date: true } } },
       }),
       prisma.transaction.findMany({
         where: { student_id: studentId }, orderBy: { paid_at: "desc" }, take: limit, skip: offset,
       }),
       prisma.mealAttendance.count({ where: { student_id: studentId } }),
-      prisma.snackToken.count({ where: { student_id: studentId } }),
+      prisma.rewardLog.count({ where: { student_id: studentId } }),
       prisma.transaction.count({ where: { student_id: studentId } }),
     ]);
 
     res.json({
       meals: { data: meals.map((m) => ({ date: m.menu.meal_date, meal_type: m.menu.meal_type, items: parseItems(m.menu.items), deduction: m.deduction_amount, scanned_at: m.scanned_at })), total: totalMeals },
-      tokens: { data: tokens.map((t) => ({ date: t.poll?.menu?.meal_date, meal_type: t.poll?.menu?.meal_type, token_code: t.token_code, status: t.status, redeemed_at: t.redeemed_at })), total: totalTokens },
+      rewards: { data: rewards.map((r) => ({ date: r.menu.meal_date, meal_type: r.menu.meal_type, points: r.points, reason: r.reason, created_at: r.created_at })), total: totalRewards },
       payments: { data: payments.map((p) => ({ amount: p.amount, status: p.status, gateway_ref: p.gateway_ref_id, paid_at: p.paid_at })), total: totalPayments },
       pagination: { page, limit },
     });

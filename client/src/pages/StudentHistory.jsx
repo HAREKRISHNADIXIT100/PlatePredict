@@ -18,7 +18,7 @@ export default function StudentHistory() {
 
   const tabs = [
     { key: 'meals', label: 'Meals', count: data.meals.total },
-    { key: 'tokens', label: 'Tokens', count: data.tokens.total },
+    { key: 'rewards', label: 'Rewards', count: data.rewards.total },
     { key: 'payments', label: 'Payments', count: data.payments.total },
   ];
 
@@ -26,7 +26,7 @@ export default function StudentHistory() {
     <>
       <div className="page-header">
         <h1>History</h1>
-        <p>Your meal, token, and payment records</p>
+        <p>Your meal, reward, and payment records</p>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -70,29 +70,31 @@ export default function StudentHistory() {
         </div>
       )}
 
-      {tab === 'tokens' && (
+      {tab === 'rewards' && (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Meal</th>
-                <th>Token Code</th>
-                <th>Status</th>
+                <th>Points</th>
+                <th>Reason</th>
               </tr>
             </thead>
             <tbody>
-              {data.tokens.data.length === 0 ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>No tokens yet</td></tr>
+              {data.rewards.data.length === 0 ? (
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>No reward records yet</td></tr>
               ) : (
-                data.tokens.data.map((t, i) => (
+                data.rewards.data.map((r, i) => (
                   <tr key={i}>
-                    <td>{t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}</td>
-                    <td><span className="badge badge-accent">{t.meal_type || '—'}</span></td>
-                    <td style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{t.token_code}</td>
+                    <td>{r.date ? new Date(r.date).toLocaleDateString('en-IN') : '—'}</td>
+                    <td><span className="badge badge-accent">{r.meal_type || '—'}</span></td>
+                    <td style={{ color: r.points > 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+                      {r.points > 0 ? '+' : ''}{r.points} pts
+                    </td>
                     <td>
-                      <span className={`badge ${t.status === 'REDEEMED' ? 'badge-green' : t.status === 'EXPIRED' ? 'badge-red' : 'badge-orange'}`}>
-                        {t.status}
+                      <span className={`badge ${r.reason === 'MEAL_SKIP_REWARD' ? 'badge-green' : 'badge-red'}`}>
+                        {r.reason === 'MEAL_SKIP_REWARD' ? '🏆 Meal Skip Reward' : '⚠️ Violation Fine'}
                       </span>
                     </td>
                   </tr>

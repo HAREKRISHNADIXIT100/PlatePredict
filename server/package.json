@@ -4,7 +4,15 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "node src/index.js",
-    "seed": "node prisma/seed.js"
+    "start": "NODE_ENV=production node src/index.js",
+
+    "db:migrate:dev": "npx prisma migrate dev",
+    "db:migrate:deploy": "npx prisma migrate deploy",
+    "db:generate": "npx prisma generate",
+    "db:studio": "npx prisma studio",
+
+    "seed": "node prisma/seed.js",
+    "seed:prod": "node prisma/seed_production.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
