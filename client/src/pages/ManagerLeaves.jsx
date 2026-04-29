@@ -96,17 +96,17 @@ export default function ManagerLeaves() {
               />
               
               {!selectedStudent && results.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', zIndex: 10, maxHeight: 200, overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1e2235', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', zIndex: 50, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
                   {results.map((s) => (
                     <div 
                       key={s.id} 
                       onClick={() => { setSelectedStudent(s); setResults([]); }}
-                      style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-                      onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-card-hover)'}
-                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                      style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1e2235', transition: 'background 0.15s' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#2a3050'}
+                      onMouseOut={(e) => e.currentTarget.style.background = '#1e2235'}
                     >
-                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{s.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{s.hostel_id} • {s.email}</div>
+                      <div style={{ fontWeight: 600, color: '#f0f4ff' }}>{s.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#8b95b5' }}>{s.hostel_id} • {s.email}</div>
                     </div>
                   ))}
                 </div>

@@ -1,21 +1,23 @@
 // prisma/seed.js
-// ⚠️  DEV ONLY — Wipes ALL data and inserts fake students, menus, polls, etc.
+// ✅ ADDITIVE ONLY — Never deletes any existing data.
+// Users are upserted (existing accounts preserved). Duplicate menus/polls are skipped.
 // NEVER run this in production. Use seed_production.js for initial prod setup.
 
-require("dotenv").config(); // Load .env so NODE_ENV is available
+require("dotenv").config();
 
 // ─── SAFETY GUARDS ────────────────────────────────────────────────────────────
+// 🔒 PERMANENT: This seed script must NEVER delete user accounts or any real data.
+// Any future change that adds deleteMany/delete calls will be REJECTED here.
 if (process.env.NODE_ENV === "production") {
   console.error("🚫 REFUSED: seed.js cannot run in NODE_ENV=production.");
-  console.error("   This script DELETES ALL DATA and inserts fake records.");
   console.error("   For production setup, use: node prisma/seed_production.js");
   process.exit(1);
 }
 
 if (!process.argv.includes("--force")) {
-  console.error("⚠️  WARNING: This will DELETE ALL existing data (users, menus, polls, etc.).");
-  console.error("   If you're sure, re-run with: npm run seed -- --force");
-  console.error("   For initial production setup, use: npm run seed:prod");
+  console.error("ℹ️  This seed is ADDITIVE — it will NOT delete any existing accounts or data.");
+  console.error("   It only adds new fake students and menus, skipping any that already exist.");
+  console.error("   To proceed, re-run with: npm run seed -- --force");
   process.exit(1);
 }
 
@@ -36,13 +38,7 @@ function randomChoice(arr) {
 }
 
 async function main() {
-  console.log("🌱 Wiping database (Transactions, Attendance, RewardLogs, Polls, Menus, Users)...");
-  await prisma.rewardLog.deleteMany({});
-  await prisma.transaction.deleteMany({});
-  await prisma.mealAttendance.deleteMany({});
-  await prisma.poll.deleteMany({});
-  await prisma.menu.deleteMany({});
-  await prisma.user.deleteMany({});
+  console.log("🌱 Additive seed — existing data will NOT be deleted.");
 
   console.log("🌱 Simulating 50 Students...");
   const defaultPassword = await bcrypt.hash("Student@1234", 10);
@@ -81,10 +77,16 @@ async function main() {
     });
   }
 
-  // Insert users
-  await prisma.user.createMany({ data: usersToInsert });
+  // Upsert users — existing emails are updated, new ones are inserted
+  for (const u of usersToInsert) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: {},          // keep existing data intact
+      create: u,
+    });
+  }
   const allStudents = await prisma.user.findMany({ where: { role: "STUDENT" } });
-  console.log(`✅ Generated ${allStudents.length} simulated students & 1 manager.`);
+  console.log(`✅ Upserted ${allStudents.length} students & 1 manager (existing records preserved).`);
 
   console.log("🌱 Generating 14 Days of Historical Activity (Polls & Attendance)...");
   const today = new Date();
@@ -112,6 +114,12 @@ async function main() {
       const poll_cutoff_time = new Date(serve_time.getTime() - 4 * 60 * 60 * 1000);
       const isPastServe = serve_time < new Date();
       
+      // Skip this meal slot if a menu with the same serve_time & type already exists
+      const existingMenu = await prisma.menu.findFirst({
+        where: { serve_time, meal_type: meal.type },
+      });
+      if (existingMenu) continue;
+
       const menu = await prisma.menu.create({
         data: {
           meal_date: currentDay,
@@ -119,7 +127,7 @@ async function main() {
           items: JSON.stringify(meal.items),
           serve_time,
           poll_cutoff_time,
-          rewards_processed: isPastServe, // Past meals are already processed
+          rewards_processed: isPastServe,
         }
       });
       totalMeals++;
@@ -138,15 +146,21 @@ async function main() {
           else if (rand < 0.90) intention = "NO";
 
           if (intention !== "NONE") {
-            await prisma.poll.create({
-              data: {
-                student_id: student.id,
-                menu_id: menu.id,
-                intention,
-                voted_at: new Date(poll_cutoff_time.getTime() - Math.floor(Math.random() * 3600000)),
-              }
+            // Skip if poll already exists for this student+menu (@@unique constraint)
+            const existingPoll = await prisma.poll.findUnique({
+              where: { student_id_menu_id: { student_id: student.id, menu_id: menu.id } },
             });
-            totalPolls++;
+            if (!existingPoll) {
+              await prisma.poll.create({
+                data: {
+                  student_id: student.id,
+                  menu_id: menu.id,
+                  intention,
+                  voted_at: new Date(poll_cutoff_time.getTime() - Math.floor(Math.random() * 3600000)),
+                }
+              });
+              totalPolls++;
+            }
 
             if (intention === "YES") {
               // ~90% of YES voters actually attend

@@ -19,18 +19,18 @@ const checkEmailDomain = (req, res, next) => {
 
 const validateRegister = [
   body("name").trim().notEmpty().withMessage("Name is required."),
-  body("email").isEmail().normalizeEmail().withMessage("A valid email is required."),
+  body("email").isEmail().toLowerCase().trim().withMessage("A valid email is required."),
   body("hostel_id").trim().notEmpty().withMessage("Hostel ID is required."),
 ];
 
 const validateVerifyOtp = [
-  body("email").isEmail().normalizeEmail().withMessage("Valid email required."),
+  body("email").isEmail().toLowerCase().trim().withMessage("Valid email required."),
   body("otp_code").isLength({ min: 6, max: 6 }).isNumeric().withMessage("OTP must be 6 digits."),
   body("password").isLength({ min: 8 }).withMessage("Password must be at least 8 characters."),
 ];
 
 const validateLogin = [
-  body("email").isEmail().normalizeEmail().withMessage("Valid email required."),
+  body("email").isEmail().toLowerCase().trim().withMessage("Valid email required."),
   body("password").notEmpty().withMessage("Password is required."),
 ];
 
