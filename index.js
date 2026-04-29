@@ -53,6 +53,12 @@ app.get("/health", (req, res) =>
   res.json({ status: "ok", timestamp: new Date().toISOString() })
 );
 
+// Root route taaki main URL khali na dikhe
+app.get("/", (req, res) => {
+  res.send("PlatePredict API is live! Use /health to check status.");
+});
+
+
 // ─── 404 Catch-all ────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: "Endpoint not found." });
