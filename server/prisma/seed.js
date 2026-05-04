@@ -7,17 +7,9 @@ require("dotenv").config();
 
 // ─── SAFETY GUARDS ────────────────────────────────────────────────────────────
 // 🔒 PERMANENT: This seed script must NEVER delete user accounts or any real data.
-// Any future change that adds deleteMany/delete calls will be REJECTED here.
 if (process.env.NODE_ENV === "production") {
   console.error("🚫 REFUSED: seed.js cannot run in NODE_ENV=production.");
   console.error("   For production setup, use: node prisma/seed_production.js");
-  process.exit(1);
-}
-
-if (!process.argv.includes("--force")) {
-  console.error("ℹ️  This seed is ADDITIVE — it will NOT delete any existing accounts or data.");
-  console.error("   It only adds new fake students and menus, skipping any that already exist.");
-  console.error("   To proceed, re-run with: npm run seed -- --force");
   process.exit(1);
 }
 

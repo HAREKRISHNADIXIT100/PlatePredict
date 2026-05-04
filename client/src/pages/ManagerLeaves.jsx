@@ -75,7 +75,7 @@ export default function ManagerLeaves() {
       </div>
 
       <div className="card-grid">
-        <div className="card" style={{ gridColumn: 'span 1' }}>
+        <div className="card" style={{ gridColumn: 'span 1', overflow: 'visible', position: 'relative' }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: 16 }}>Assign New Leave</h2>
           
           {error && <div className="alert alert-error">{error}</div>}
@@ -96,14 +96,14 @@ export default function ManagerLeaves() {
               />
               
               {!selectedStudent && results.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1e2235', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', zIndex: 50, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a2035', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 'var(--radius-sm)', zIndex: 200, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', marginTop: 4 }}>
                   {results.map((s) => (
                     <div 
                       key={s.id} 
                       onClick={() => { setSelectedStudent(s); setResults([]); }}
-                      style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1e2235', transition: 'background 0.15s' }}
-                      onMouseOver={(e) => e.currentTarget.style.background = '#2a3050'}
-                      onMouseOut={(e) => e.currentTarget.style.background = '#1e2235'}
+                      style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'transparent', transition: 'background 0.15s' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(20,184,166,0.12)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                     >
                       <div style={{ fontWeight: 600, color: '#f0f4ff' }}>{s.name}</div>
                       <div style={{ fontSize: '0.8rem', color: '#8b95b5' }}>{s.hostel_id} • {s.email}</div>
