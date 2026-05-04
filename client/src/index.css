@@ -629,4 +629,10 @@ tr:hover td {
     background: var(--accent-glow);
     box-shadow: 0 0 15px rgba(20, 184, 166, 0.15);
   }
+  
+  .mobile-link svg {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
 }
