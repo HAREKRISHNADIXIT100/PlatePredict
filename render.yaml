@@ -2,9 +2,10 @@ services:
   - type: web
     name: platepredict-backend
     env: node
+    runtime: node
     rootDir: server
     buildCommand: npm install && npx prisma generate
-    startCommand: npm start
+    startCommand: npx prisma migrate deploy && node src/index.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -14,6 +15,14 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: OTP_EXPIRY_MINUTES
+        value: 10
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
@@ -22,3 +31,7 @@ services:
         sync: false
       - key: ALLOWED_EMAIL_DOMAINS
         value: nitj.ac.in
+      - key: MANAGER_EMAIL
+        value: manager@nitj.ac.in
+      - key: MANAGER_PASSWORD
+        sync: false
