@@ -9,8 +9,8 @@ const isDev = () => process.env.NODE_ENV !== "production";
 // Create standard transporter using environment variables
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false, // true for 465, false for other ports
+  port: parseInt(process.env.SMTP_PORT) || 465,
+  secure: parseInt(process.env.SMTP_PORT) === 465 || !process.env.SMTP_PORT, // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
