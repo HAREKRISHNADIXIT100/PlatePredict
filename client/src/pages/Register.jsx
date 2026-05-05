@@ -18,6 +18,9 @@ export default function Register() {
     setLoading(true);
     try {
       const data = await api.register(form);
+      if (data.fallback_otp) {
+        alert(`RENDER FREE TIER LIMITATION:\n\nEmails are blocked on Render Free Tier. \n\nYour OTP is: ${data.fallback_otp}\n\n(Use this to log in!)`);
+      }
       navigate('/verify-otp', {
         state: { email: form.email, pending_token: data.pending_token },
       });

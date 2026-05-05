@@ -36,11 +36,17 @@ router.post("/register", validateRegister, handleValidationErrors, checkEmailDom
 
     const pendingToken = jwt.sign({ name, email, hostel_id }, JWT_SECRET, { expiresIn: `${expiryMinutes}m` });
 
-    await sendOtpEmail(email, otp_code, name);
-
-    res.status(202).json({ message: "OTP sent to email.", pending_token: pendingToken });
-  } catch (err) {
-    next(err);
+    try {
+      await sendOtpEmail(email, otp_code, name);
+      res.status(202).json({ message: "OTP sent to email.", pending_token: pendingToken });
+    } catch (emailErr) {
+      console.warn("⚠️ Email delivery failed, providing fallback OTP in response:", emailErr.message);
+      res.status(202).json({ 
+        message: "Demo Mode: Email blocked by free host. Using fallback OTP.", 
+        pending_token: pendingToken, 
+        fallback_otp: otp_code 
+      });
+    }
   }
 });
 
